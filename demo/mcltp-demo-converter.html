@@ -171,18 +171,21 @@
 
     <script src="mcltp.ffmpeg-lgpl.js"></script>
     <script>
+        // Initialize FFmpeg
+        let ffmpeg;
         document.addEventListener('DOMContentLoaded', async function() {
             // Show loading overlay
             const loadingOverlay = document.getElementById('loadingOverlay');
             const loadingText = document.getElementById('loadingText');
             loadingOverlay.style.display = 'flex';
 
-            // Initialize FFmpeg
-            let ffmpeg;
             try {
-                // Create FFmpeg instance and wait for it to load
-                ffmpeg = await createFFmpeg();
-                // The module is ready to use after createFFmpeg() resolves
+                // Create FFmpeg instance with logging handlers
+                ffmpeg = await createFFmpeg({
+                    printErr:message=> {
+                        console.error(message);
+                    },
+                });
                 loadingOverlay.style.display = 'none';
             } catch (error) {
                 loadingText.textContent = 'Failed to load FFmpeg: ' + error.message;
@@ -352,12 +355,12 @@
                     for (let i = 0; i < voiceParts.length; i++) {
                         const part = voiceParts[i];
                         const data = await part.file.arrayBuffer();
+                        console.log(`Writing file: input${i}.wav (${part.file.size} bytes)`);
                         ffmpeg.FS.writeFile(`input${i}.wav`, new Uint8Array(data));
                     }
 
                     // Build command array
                     const args = [
-                        'ffmpeg',  // First argument must be the program name
                         '-y'       // Overwrite output if exists
                     ];
                     
@@ -385,10 +388,11 @@
                     args.push('output.opus');
 
                     console.log('Running FFmpeg command:', args.join(' '));
-                    const result = ffmpeg.callMain(args);
+                    const result = await ffmpeg.callMain(args);
                     if (result !== 0) {
                         throw new Error(`FFmpeg command failed with code ${result}`);
                     }
+                    console.log('FFmpeg processing completed successfully.');
 
                     // Read the output file
                     const data = ffmpeg.FS.readFile('output.opus');
