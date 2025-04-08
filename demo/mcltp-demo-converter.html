@@ -361,7 +361,7 @@
 
                     // Build command array
                     const args = [
-                        '-y'       // Overwrite output if exists
+                        //'-y'       // Overwrite output if exists
                     ];
                     
                     // Add input files
@@ -388,31 +388,40 @@
                     args.push('output.opus');
 
                     console.log('Running FFmpeg command:', args.join(' '));
-                    const result = await ffmpeg.callMain(args);
-                    if (result !== 0) {
-                        throw new Error(`FFmpeg command failed with code ${result}`);
-                    }
-                    console.log('FFmpeg processing completed successfully.');
 
-                    // Read the output file
-                    const data = ffmpeg.FS.readFile('output.opus');
-                    
-                    // Create download link
-                    const blob = new Blob([data.buffer], { type: 'audio/opus' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${songTitle}.opus`;
-                    a.click();
-                    URL.revokeObjectURL(url);
+                    ffmpeg.onExit = result => {
 
-                    // Cleanup files
-                    voiceParts.forEach((_, i) => {
-                        ffmpeg.FS.unlink(`input${i}.wav`);
-                    });
-                    ffmpeg.FS.unlink('output.opus');
+                        if (result !== 0) {
+                            throw new Error(`FFmpeg command failed with code ${result}`);
+                        }
+                        console.log('FFmpeg processing completed successfully.');
+
+                        console.log('Reading output file...');
+                        // Read the output file
+                        const data = ffmpeg.FS.readFile('output.opus');
+                        
+                        // Create download link
+                        const blob = new Blob([data.buffer], { type: 'audio/opus' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${songTitle}.opus`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+
+                        // Cleanup files
+                        // voiceParts.forEach((_, i) => {
+                        //     ffmpeg.FS.unlink(`input${i}.wav`);
+                        // });
+                        // ffmpeg.FS.unlink('output.opus');
+                        
+                        loadingOverlay.style.display = 'none';
+                    };
+
+                    ffmpeg.callMain(args);
                     
-                    loadingOverlay.style.display = 'none';
+                    // ffmpeg calls onExit when
+                    
                 } catch (error) {
                     console.error('FFmpeg processing error:', error);
                     loadingText.textContent = 'Error processing files: ' + error.message;
