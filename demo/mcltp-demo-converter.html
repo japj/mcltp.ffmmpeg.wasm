@@ -114,6 +114,33 @@
             word-break: break-all;
             display: none;
         }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: white;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -137,8 +164,32 @@
     
     <div class="output" id="output"></div>
 
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div id="loadingText">Loading FFmpeg...</div>
+    </div>
+
+    <script src="mcltp.ffmpeg-lgpl.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Show loading overlay
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            loadingOverlay.style.display = 'flex';
+
+            // Initialize FFmpeg
+            let ffmpeg;
+            try {
+                // Create FFmpeg instance and wait for it to load
+                ffmpeg = await createFFmpeg();
+                // The module is ready to use after createFFmpeg() resolves
+                loadingOverlay.style.display = 'none';
+            } catch (error) {
+                loadingText.textContent = 'Failed to load FFmpeg: ' + error.message;
+                console.error('FFmpeg loading error:', error);
+                return;
+            }
+
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
             const voicePartsList = document.getElementById('voicePartsList');
@@ -286,52 +337,83 @@
                 handleFiles(files);
             });
             
-            // Generate FFmpeg command with channel metadata using CHANNEL_N format
-            convertButton.addEventListener('click', function() {
+            // Generate FFmpeg command and process files
+            convertButton.addEventListener('click', async function() {
                 if (voiceParts.length === 0) {
                     alert('Please add voice parts first.');
                     return;
                 }
-                
-                let command = 'ffmpeg';
-                
-                // Add input files
-                voiceParts.forEach(part => {
-                    command += ` -i "${part.originalName}"`;
-                });
-                
-                // Add channel mapping with filter_complex
-                command += ' -filter_complex "';
-                
-                voiceParts.forEach((part, index) => {
-                    command += `[${index}:a]`;
-                });
-                
-                command += `amerge=inputs=${voiceParts.length}[aout]"`;
-                
-                // Map the merged output
-                command += ' -map "[aout]"';
-                
-                // Add Opus codec with mapping_family 255
-                command += ' -c:a libopus -mapping_family 255';
-                
-                // Get the song title
-                const songTitle = songTitleInput.value.trim() || "Choir Recording";
-                
-                // Add title metadata
-                command += ` -metadata title="${songTitle}"`;
-                
-                // Add custom channel metadata using CHANNEL_N format
-                voiceParts.forEach((part, index) => {
-                    command += ` -metadata CHANNEL_${index+1}="${part.name}"`;
-                });
-                
-                // Output file
-                command += ' output_combined.opus';
-                
-                console.log(command);
-                output.textContent = command;
-                output.style.display = 'block';
+
+                loadingOverlay.style.display = 'flex';
+                loadingText.textContent = 'Processing audio files...';
+
+                try {
+                    // Write input files to FFmpeg virtual filesystem
+                    for (let i = 0; i < voiceParts.length; i++) {
+                        const part = voiceParts[i];
+                        const data = await part.file.arrayBuffer();
+                        ffmpeg.FS.writeFile(`input${i}.wav`, new Uint8Array(data));
+                    }
+
+                    // Build command array
+                    const args = [
+                        'ffmpeg',  // First argument must be the program name
+                        '-y'       // Overwrite output if exists
+                    ];
+                    
+                    // Add input files
+                    voiceParts.forEach((_, i) => {
+                        args.push('-i', `input${i}.wav`);
+                    });
+
+                    // Add filter_complex for merging
+                    const filterComplex = voiceParts.map((_, i) => `[${i}:a]`).join('') + 
+                                       `amerge=inputs=${voiceParts.length}[aout]`;
+                    args.push('-filter_complex', filterComplex);
+                    args.push('-map', '[aout]');
+                    args.push('-c:a', 'libopus');
+                    args.push('-mapping_family', '255');
+                    
+                    const songTitle = songTitleInput.value.trim() || "Choir Recording";
+                    args.push('-metadata', `title=${songTitle}`);
+                    
+                    // Add channel metadata
+                    voiceParts.forEach((part, i) => {
+                        args.push('-metadata', `CHANNEL_${i+1}=${part.name}`);
+                    });
+
+                    args.push('output.opus');
+
+                    console.log('Running FFmpeg command:', args.join(' '));
+                    const result = ffmpeg.callMain(args);
+                    if (result !== 0) {
+                        throw new Error(`FFmpeg command failed with code ${result}`);
+                    }
+
+                    // Read the output file
+                    const data = ffmpeg.FS.readFile('output.opus');
+                    
+                    // Create download link
+                    const blob = new Blob([data.buffer], { type: 'audio/opus' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${songTitle}.opus`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+
+                    // Cleanup files
+                    voiceParts.forEach((_, i) => {
+                        ffmpeg.FS.unlink(`input${i}.wav`);
+                    });
+                    ffmpeg.FS.unlink('output.opus');
+                    
+                    loadingOverlay.style.display = 'none';
+                } catch (error) {
+                    console.error('FFmpeg processing error:', error);
+                    loadingText.textContent = 'Error processing files: ' + error.message;
+                    loadingOverlay.style.display = 'none';
+                }
             });
             
             // Helper function to format file size
