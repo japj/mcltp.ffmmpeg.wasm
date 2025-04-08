@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choir Voice Parts Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .song-title-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .song-title-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .song-title-input {
+            width: 80%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .drop-zone {
+            border: 2px dashed #3498db;
+            border-radius: 5px;
+            padding: 25px;
+            text-align: center;
+            margin: 20px 0;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .drop-zone:hover {
+            background-color: #e9ecef;
+        }
+        .drop-zone.active {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .voice-parts {
+            list-style-type: none;
+            padding: 0;
+        }
+        .voice-part {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: move;
+        }
+        .voice-part.dragging {
+            opacity: 0.5;
+        }
+        .handle {
+            margin-right: 10px;
+            color: #6c757d;
+            cursor: grab;
+        }
+        .part-name {
+            flex-grow: 1;
+            margin-right: 10px;
+            padding: 5px;
+            border: 1px solid transparent;
+            border-radius: 3px;
+        }
+        .part-name:focus {
+            border-color: #80bdff;
+            outline: 0;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        .file-info {
+            color: #6c757d;
+            font-size: 0.8em;
+            margin-right: 10px;
+        }
+        .buttons {
+            margin-top: 20px;
+            text-align: center;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .output {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Choir Voice Parts Manager</h1>
+    
+    <div class="song-title-container">
+        <label class="song-title-label" for="songTitle">Song Title:</label>
+        <input type="text" id="songTitle" class="song-title-input" placeholder="Enter choir recording title" value="Choir Recording">
+    </div>
+    
+    <div class="drop-zone" id="dropZone">
+        <p>Drag and drop voice part files here or click to browse</p>
+        <input type="file" id="fileInput" multiple style="display: none">
+    </div>
+    
+    <ul class="voice-parts" id="voicePartsList"></ul>
+    
+    <div class="buttons">
+        <button id="convertButton">Generate FFmpeg Command</button>
+    </div>
+    
+    <div class="output" id="output"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const voicePartsList = document.getElementById('voicePartsList');
+            const convertButton = document.getElementById('convertButton');
+            const output = document.getElementById('output');
+            const songTitleInput = document.getElementById('songTitle');
+            
+            // Voice parts storage
+            let voiceParts = [];
+            
+            // Handle file selection
+            function handleFiles(files) {
+                for (const file of files) {
+                    if (file.type.startsWith('audio/')) {
+                        const fileName = file.name;
+                        const nameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+                        
+                        voiceParts.push({
+                            file: file,
+                            name: nameWithoutExtension,
+                            originalName: fileName
+                        });
+                    }
+                }
+                updateVoicePartsList();
+            }
+            
+            // Update the list of voice parts in the UI
+            function updateVoicePartsList() {
+                voicePartsList.innerHTML = '';
+                
+                voiceParts.forEach((part, index) => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'voice-part';
+                    listItem.dataset.index = index;
+                    listItem.draggable = true;
+                    
+                    const handle = document.createElement('div');
+                    handle.className = 'handle';
+                    handle.innerHTML = '&#8942; &#8942;';
+                    
+                    const nameInput = document.createElement('div');
+                    nameInput.className = 'part-name';
+                    nameInput.textContent = part.name;
+                    nameInput.contentEditable = true;
+                    nameInput.addEventListener('blur', function() {
+                        voiceParts[index].name = this.textContent.trim();
+                    });
+                    
+                    const fileInfo = document.createElement('div');
+                    fileInfo.className = 'file-info';
+                    fileInfo.textContent = `(${formatFileSize(part.file.size)})`;
+                    
+                    listItem.appendChild(handle);
+                    listItem.appendChild(nameInput);
+                    listItem.appendChild(fileInfo);
+                    voicePartsList.appendChild(listItem);
+                    
+                    // Set up drag events
+                    listItem.addEventListener('dragstart', handleDragStart);
+                    listItem.addEventListener('dragover', handleDragOver);
+                    listItem.addEventListener('dragenter', handleDragEnter);
+                    listItem.addEventListener('dragleave', handleDragLeave);
+                    listItem.addEventListener('drop', handleDrop);
+                    listItem.addEventListener('dragend', handleDragEnd);
+                });
+            }
+            
+            // Drag and drop for list reordering
+            let dragSourceIndex = null;
+            
+            function handleDragStart(e) {
+                this.classList.add('dragging');
+                dragSourceIndex = parseInt(this.dataset.index);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', dragSourceIndex);
+            }
+            
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            }
+            
+            function handleDragEnter(e) {
+                this.classList.add('drag-over');
+            }
+            
+            function handleDragLeave(e) {
+                this.classList.remove('drag-over');
+            }
+            
+            function handleDrop(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                this.classList.remove('drag-over');
+                
+                const targetIndex = parseInt(this.dataset.index);
+                if (dragSourceIndex !== null && dragSourceIndex !== targetIndex) {
+                    const itemToMove = voiceParts[dragSourceIndex];
+                    voiceParts.splice(dragSourceIndex, 1);
+                    voiceParts.splice(targetIndex, 0, itemToMove);
+                    updateVoicePartsList();
+                }
+                
+                return false;
+            }
+            
+            function handleDragEnd(e) {
+                document.querySelectorAll('.voice-part').forEach(item => {
+                    item.classList.remove('dragging');
+                    item.classList.remove('drag-over');
+                });
+            }
+            
+            // File drop zone event handlers
+            dropZone.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+                this.value = ''; // Reset to allow selecting the same files again
+            });
+            
+            dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.classList.add('active');
+            });
+            
+            dropZone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.classList.remove('active');
+            });
+            
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.classList.remove('active');
+                
+                const files = e.dataTransfer.files;
+                handleFiles(files);
+            });
+            
+            // Generate FFmpeg command with channel metadata using CHANNEL_N format
+            convertButton.addEventListener('click', function() {
+                if (voiceParts.length === 0) {
+                    alert('Please add voice parts first.');
+                    return;
+                }
+                
+                let command = 'ffmpeg';
+                
+                // Add input files
+                voiceParts.forEach(part => {
+                    command += ` -i "${part.originalName}"`;
+                });
+                
+                // Add channel mapping with filter_complex
+                command += ' -filter_complex "';
+                
+                voiceParts.forEach((part, index) => {
+                    command += `[${index}:a]`;
+                });
+                
+                command += `amerge=inputs=${voiceParts.length}[aout]"`;
+                
+                // Map the merged output
+                command += ' -map "[aout]"';
+                
+                // Add Opus codec with mapping_family 255
+                command += ' -c:a libopus -mapping_family 255';
+                
+                // Get the song title
+                const songTitle = songTitleInput.value.trim() || "Choir Recording";
+                
+                // Add title metadata
+                command += ` -metadata title="${songTitle}"`;
+                
+                // Add custom channel metadata using CHANNEL_N format
+                voiceParts.forEach((part, index) => {
+                    command += ` -metadata CHANNEL_${index+1}="${part.name}"`;
+                });
+                
+                // Output file
+                command += ' output_combined.opus';
+                
+                console.log(command);
+                output.textContent = command;
+                output.style.display = 'block';
+            });
+            
+            // Helper function to format file size
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+        });
+    </script>
+</body>
+</html>
