@@ -380,10 +380,14 @@
                     const songTitle = songTitleInput.value.trim() || "Choir Recording";
                     args.push('-metadata', `title=${songTitle}`);
                     
-                    // Add channel metadata
-                    voiceParts.forEach((part, i) => {
-                        args.push('-metadata', `CHANNEL_${i+1}=${part.name}`);
-                    });
+                    // Add channel metadatan(old style)
+                    const channelOrder = voiceParts.map(part => part.name).join(', ');
+                    args.push('-metadata', `comment=Channel order: ${channelOrder}`);
+                   
+                    // TODO: this is the new metadata format
+                    // voiceParts.forEach((part, i) => {
+                    //     args.push('-metadata', `CHANNEL_${i+1}=${part.name}`);
+                    // });
 
                     args.push('output.opus');
 
