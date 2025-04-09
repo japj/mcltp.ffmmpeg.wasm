@@ -88,6 +88,18 @@
             font-size: 0.8em;
             margin-right: 10px;
         }
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .delete-btn:hover {
+            background: #c82333;
+        }
         .buttons {
             margin-top: 20px;
             text-align: center;
@@ -246,9 +258,20 @@
                     fileInfo.className = 'file-info';
                     fileInfo.textContent = `(${formatFileSize(part.file.size)})`;
                     
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.textContent = '×';
+                    deleteBtn.title = 'Remove this voice part';
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        voiceParts.splice(index, 1);
+                        updateVoicePartsList();
+                    };
+                    
                     listItem.appendChild(handle);
                     listItem.appendChild(nameInput);
                     listItem.appendChild(fileInfo);
+                    listItem.appendChild(deleteBtn);
                     voicePartsList.appendChild(listItem);
                     
                     // Set up drag events
