@@ -32,6 +32,23 @@
             border-radius: 4px;
             font-size: 16px;
         }
+        .bitrate-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .bitrate-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .bitrate-input {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            text-align: right;
+        }
         .drop-zone {
             border: 2px dashed #3498db;
             border-radius: 5px;
@@ -162,6 +179,11 @@
         <label class="song-title-label" for="songTitle">Song Title:</label>
         <input type="text" id="songTitle" class="song-title-input" placeholder="Enter choir recording title" value="Choir Recording">
     </div>
+
+    <div class="bitrate-container">
+        <label class="bitrate-label" for="bitratePerPart">Average encoding bitrate per part (kbps):</label>
+        <input type="number" id="bitratePerPart" class="bitrate-input" value="48" min="16" max="512">
+    </div>
     
     <div class="drop-zone" id="dropZone">
         <p>Drag and drop voice part files here or click to browse</p>
@@ -211,6 +233,7 @@
             const convertButton = document.getElementById('convertButton');
             const output = document.getElementById('output');
             const songTitleInput = document.getElementById('songTitle');
+            const bitratePerPartInput = document.getElementById('bitratePerPart');
             
             // Voice parts storage
             let voiceParts = [];
@@ -398,6 +421,12 @@
                     args.push('-filter_complex', filterComplex);
                     args.push('-map', '[aout]');
                     args.push('-c:a', 'libopus');
+                    
+                    // Calculate bitrate based on number of parts and user input
+                    const bitratePerPart = Math.max(16, Math.min(512, parseInt(bitratePerPartInput.value) || 48));
+                    const totalBitrate = voiceParts.length * bitratePerPart;
+                    args.push('-b:a', `${totalBitrate}k`);
+                    
                     args.push('-mapping_family', '255');
                     
                     const songTitle = songTitleInput.value.trim() || "Choir Recording";
