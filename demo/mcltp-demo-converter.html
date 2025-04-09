@@ -209,7 +209,15 @@
         const checks = {
             webWorkers: 'Worker' in window,
             crossOriginIsolated: window.crossOriginIsolated === true,
-            simd: WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11]))
+            simd: WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,9,1,7,0,65,0,253,15,26,11])),
+            sharedMemory: (() => {
+                try {
+                    new SharedArrayBuffer(1);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            })()
         };
 
         if (!Object.values(checks).every(v => v)) {
@@ -218,7 +226,7 @@
                 .map(([k]) => k)
                 .join(', ');
             
-            const message = `Missing required features: ${missing}\n\nThis application requires:\n- Web Workers\n- Cross-Origin Isolation\n- Fixed-Width SIMD support`;
+            const message = `Missing required features: ${missing}\n\nThis application requires:\n- Web Workers\n- Cross-Origin Isolation\n- Fixed-Width SIMD support\n- Shared Memory support`;
             alert(message);
             throw new Error(message);
         }
@@ -226,24 +234,39 @@
         // Initialize FFmpeg
         let ffmpeg;
         document.addEventListener('DOMContentLoaded', async function() {
-            // Show loading overlay
             const loadingOverlay = document.getElementById('loadingOverlay');
             const loadingText = document.getElementById('loadingText');
             loadingOverlay.style.display = 'flex';
 
             try {
-                // Create FFmpeg instance with logging handlers
                 ffmpeg = await createFFmpeg({
-                    printErr:message=> {
-                        console.error(message);
+                    logger: message => console.log('FFmpeg:', message),
+                    progress: p => {
+                        console.log('FFmpeg progress:', p);
+                        loadingText.textContent = `Processing: ${(p.ratio * 100).toFixed(0)}%`;
                     },
+                    printErr: message => {
+                        console.error('FFmpeg error:', message);
+                        if (loadingOverlay.style.display === 'flex') {
+                            loadingText.textContent = 'FFmpeg error: ' + message;
+                        }
+                    }
                 });
+
+                loadingText.textContent = 'FFmpeg initialized successfully';
                 loadingOverlay.style.display = 'none';
             } catch (error) {
-                loadingText.textContent = 'Failed to load FFmpeg: ' + error.message;
-                console.error('FFmpeg loading error:', error);
+                console.error('FFmpeg initialization error:', error);
+                loadingText.textContent = 'Failed to initialize FFmpeg: ' + error.message;
                 return;
             }
+
+            // Add global error handler for worker
+            window.addEventListener('unhandledrejection', function(event) {
+                console.error('Unhandled promise rejection:', event.reason);
+                loadingText.textContent = 'Error: ' + event.reason;
+                loadingOverlay.style.display = 'none';
+            });
 
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
@@ -450,7 +473,7 @@
                     const songTitle = songTitleInput.value.trim() || "Choir Recording";
                     args.push('-metadata', `title=${songTitle}`);
                     
-                    // Add channel metadatan(old style)
+                    // Add channel metadata (old style)
                     const channelOrder = voiceParts.map(part => part.name).join(', ');
                     args.push('-metadata', `comment=Channel order: ${channelOrder}`);
                    
