@@ -150,7 +150,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.1);
             z-index: 1000;
             align-items: center;
             justify-content: center;
@@ -169,6 +169,24 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        .log-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #2c3e50;
+            border-radius: 4px;
+            color: #ecf0f1;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 2px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-error {
+            color: #e74c3c;
         }
     </style>
 </head>
@@ -197,6 +215,7 @@
     </div>
     
     <div class="output" id="output"></div>
+    <div class="log-container" id="logContainer"></div>
 
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
@@ -235,21 +254,34 @@
         let ffmpeg;
         
         async function initFFmpeg(loadingText) {
-            
             ffmpeg = await createFFmpeg({
-                logger: message => console.log('FFmpeg:', message),
+                logger: message => {
+                    //console.log('FFmpeg:', message);
+                    appendToLog(message);
+                },
                 progress: p => {
                     console.log('FFmpeg progress:', p);
                     loadingText.textContent = `Processing: ${(p.ratio * 100).toFixed(0)}%`;
+                    appendToLog(`Progress: ${(p.ratio * 100).toFixed(0)}%`);
                 },
                 printErr: message => {
-                    console.error('FFmpeg error:', message);
-                    if (loadingOverlay.style.display === 'flex') {
-                        loadingText.textContent = 'FFmpeg error: ' + message;
-                    }
+                    //console.error('FFmpeg error:', message);
+                    appendToLog(message);
+                    // if (loadingOverlay.style.display === 'flex') {
+                    //     loadingText.textContent = 'FFmpeg error: ' + message;
+                    // }
                 }
             });
             return ffmpeg;
+        }
+
+        function appendToLog(message, isError = false) {
+            const logContainer = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry' + (isError ? ' log-error' : '');
+            entry.textContent = message;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
@@ -457,6 +489,8 @@
                     // Build command array
                     const args = [
                         //'-y'       // Overwrite output if exists
+                        '-stats',
+                        '-v','verbose',
                     ];
                     
                     // Add input files
@@ -540,6 +574,15 @@
                 else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
                 else return (bytes / 1048576).toFixed(1) + ' MB';
             }
+
+            // console.log = function(message) {
+            //     appendToLog(message);
+            //     window.console.info.apply(console, arguments);
+            // };
+            // console.error = function(message) {
+            //     appendToLog(message, true);
+            //     window.console.error.apply(console, arguments);
+            // };
         });
     </script>
 </body>
