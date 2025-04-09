@@ -233,26 +233,32 @@
 
         // Initialize FFmpeg
         let ffmpeg;
+        
+        async function initFFmpeg(loadingText) {
+            
+            ffmpeg = await createFFmpeg({
+                logger: message => console.log('FFmpeg:', message),
+                progress: p => {
+                    console.log('FFmpeg progress:', p);
+                    loadingText.textContent = `Processing: ${(p.ratio * 100).toFixed(0)}%`;
+                },
+                printErr: message => {
+                    console.error('FFmpeg error:', message);
+                    if (loadingOverlay.style.display === 'flex') {
+                        loadingText.textContent = 'FFmpeg error: ' + message;
+                    }
+                }
+            });
+            return ffmpeg;
+        }
+
         document.addEventListener('DOMContentLoaded', async function() {
             const loadingOverlay = document.getElementById('loadingOverlay');
             const loadingText = document.getElementById('loadingText');
             loadingOverlay.style.display = 'flex';
 
             try {
-                ffmpeg = await createFFmpeg({
-                    logger: message => console.log('FFmpeg:', message),
-                    progress: p => {
-                        console.log('FFmpeg progress:', p);
-                        loadingText.textContent = `Processing: ${(p.ratio * 100).toFixed(0)}%`;
-                    },
-                    printErr: message => {
-                        console.error('FFmpeg error:', message);
-                        if (loadingOverlay.style.display === 'flex') {
-                            loadingText.textContent = 'FFmpeg error: ' + message;
-                        }
-                    }
-                });
-
+                await initFFmpeg(loadingText);
                 loadingText.textContent = 'FFmpeg initialized successfully';
                 loadingOverlay.style.display = 'none';
             } catch (error) {
@@ -438,6 +444,8 @@
                 loadingText.textContent = 'Processing audio files...';
 
                 try {
+                    ffmpeg = await initFFmpeg(loadingText);
+                    
                     // Write input files to FFmpeg virtual filesystem
                     for (let i = 0; i < voiceParts.length; i++) {
                         const part = voiceParts[i];
