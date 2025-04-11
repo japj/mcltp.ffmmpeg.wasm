@@ -978,7 +978,7 @@ var createFFmpeg = (() => {
           return FS_stdin_getChar();
         },
         put_char(tty, val) {
-          if (val === null || val === 10) {
+          if (val === null || val === 10 || val === 13) {
             out(UTF8ArrayToString(tty.output));
             tty.output = [];
           } else {
@@ -1012,7 +1012,7 @@ var createFFmpeg = (() => {
       },
       default_tty1_ops: {
         put_char(tty, val) {
-          if (val === null || val === 10) {
+          if (val === null || val === 10|| val === 13) {
             err(UTF8ArrayToString(tty.output));
             tty.output = [];
           } else {
