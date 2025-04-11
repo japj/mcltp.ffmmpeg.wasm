@@ -1,6 +1,51 @@
 <html>
     <script src="mcltp.ffmpeg-lgpl.js"></script>
     <script>
+
+        function extractTimeInSeconds(timeMatch) {
+            // Example line: "frame=   54 fps=0.0 q=-0.0 size=     256kB time=00:00:02.16 bitrate= 968.9kbits/s speed=4.32x"
+            
+            if (timeMatch) {
+                const timeStr = timeMatch[1];
+                // Convert time string to seconds
+                const timeParts = timeStr.split(/[:,\.]/);
+                return parseInt(timeParts[0]) * 3600 + 
+                       parseInt(timeParts[1]) * 60 + 
+                       parseInt(timeParts[2]) + 
+                       parseFloat("0." + timeParts[3]);
+            }
+            return null;
+        }
+
+        let totalDurationInSeconds = 0; // Set this to the total duration of your input file if known
+    
+        function parseFFmpegProgressOutput(line) {
+            // Parse for progress information - FFmpeg typically outputs lines like:
+            // frame=   54 fps=0.0 q=-0.0 size=     256kB time=00:00:02.16 bitrate= 968.9kbits/s speed=4.32x
+            if (line.includes("time=") && line.includes("speed=")) {
+                const timeMatch = line.match(/time=(\d+:\d+:\d+\.\d+)/);
+                const timeInSeconds = extractTimeInSeconds(timeMatch);
+                
+                // If you know the total duration, you can calculate progress percentage
+                const progressRatio = timeInSeconds / totalDurationInSeconds;
+                console.log("progress",progressRatio);
+            }
+            if (line.includes("Duration:")) {
+                // Parse for full duration information
+                //   Duration: 00:03:45.28, start: 0.000000, bitrate: 768 kb/s
+                const durationMatch = line.match(/Duration: (\d+:\d+:\d+\.\d+)/);
+                // keep the maximum detected duration
+                if (durationMatch) {
+                    const durationInSeconds = extractTimeInSeconds(durationMatch);
+                    if (durationInSeconds > totalDurationInSeconds) {
+                        totalDurationInSeconds = durationInSeconds;
+                        console.log("Total Duration in seconds: " + totalDurationInSeconds);
+                    }
+                }
+            }
+        }
+
+
         document.addEventListener('DOMContentLoaded', async function() {
             let ffmpeg = await createFFmpeg({
                 logger: (message) => {
@@ -8,6 +53,7 @@
                 },
                 printErr: (message) => {
                     console.log(message);
+                    parseFFmpegProgressOutput(message);
                 },
 
             });
