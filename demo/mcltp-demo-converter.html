@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Choir Voice Parts Manager</title>
+    <title>Multi Channel Learning Tracks Playback - Convertor</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -254,11 +254,13 @@
     </style>
 </head>
 <body>
-    <h1>Choir Voice Parts Manager</h1>
+    <h1>Multi Channel Learning Tracks Playback - Convertor</h1>
+    <p>This convertor is related to <a href="https://www.japj.net/2025/03/23/multichannel-opus-player-proof-of-concept">My blogpost on multichannel opus player proof of concept</a></p>
+    <p>Instruction: drag & drop mono .wav files for the different voice parts below and press the button.</p>
     
     <div class="song-title-container">
         <label class="song-title-label" for="songTitle">Song Title:</label>
-        <input type="text" id="songTitle" class="song-title-input" placeholder="Enter choir recording title" value="Choir Recording">
+        <input type="text" id="songTitle" class="song-title-input" placeholder="Enter song title" value="Learning Track">
     </div>
 
     <div class="bitrate-container">
@@ -274,7 +276,7 @@
     <ul class="voice-parts" id="voicePartsList"></ul>
     
     <div class="buttons">
-        <button id="convertButton">Generate FFmpeg Command</button>
+        <button id="convertButton">Create Multi-Channel Learning Track (Opus) file</button>
     </div>
     
     <div class="output" id="output"></div>
