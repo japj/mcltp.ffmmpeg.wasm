@@ -1,0 +1,44 @@
+<html>
+    <script src="mcltp.ffmpeg-lgpl.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            let ffmpeg = await createFFmpeg({
+                logger: (message) => {
+                    console.log(message);
+                },
+                printErr: (message) => {
+                    console.log(message);
+                },
+
+            });
+
+            ffmpeg.onExit = (code) => {
+                console.log("FFmpeg exited with code " + code);
+            };
+
+            // Load the WAV file
+            const response = await fetch('A.wav');
+            const buffer = await response.arrayBuffer();
+            const uint8Array = new Uint8Array(buffer);
+            
+            // Write to FFmpeg's virtual filesystem
+            ffmpeg.FS.writeFile('A.wav', uint8Array);
+
+            // Update args to use the input file
+            const args = [
+                "-stats", 
+                "-v", "verbose",
+                "-i", "A.wav",
+                "-filter_complex", "[0:a]amerge=inputs=1[aout]",
+                "-map", "[aout]",
+                "-c:a", "libopus",
+                "-b:a", "48k",
+                "-mapping_family", "255",
+                "-metadata", "title=Choir Recording",
+                "-metadata", "comment=Channel order: A",
+                "output.opus"
+            ];
+            ffmpeg.callMain(args);
+        });
+    </script>
+</html>
