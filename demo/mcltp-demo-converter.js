@@ -76,6 +76,17 @@ function extractTimeInSeconds(timeMatch) {
     return null;
 }
 
+function updateProgressCircle(progress) {
+    const circle = document.querySelector('.progress-circle-path');
+    const percentage = document.querySelector('.progress-percentage');
+    if (circle && percentage) {
+        const circumference = 282.74; // 2 * π * 45
+        const offset = circumference - (progress * circumference);
+        circle.style.strokeDashoffset = offset;
+        percentage.textContent = Math.round(progress * 100) + '%';
+    }
+}
+
 function parseFFmpegProgressOutput(line) {
     // Parse for progress information - FFmpeg typically outputs lines like:
     // frame=   54 fps=0.0 q=-0.0 size=     256kB time=00:00:02.16 bitrate= 968.9kbits/s speed=4.32x
@@ -86,6 +97,10 @@ function parseFFmpegProgressOutput(line) {
         // If you know the total duration, you can calculate progress percentage
         const progressRatio = timeInSeconds / totalDurationInSeconds;
         console.log("progress",progressRatio);
+        if (totalDurationInSeconds > 0 && timeInSeconds) {
+            const progressRatio = Math.min(timeInSeconds / totalDurationInSeconds, 1);
+            updateProgressCircle(progressRatio);
+        }
     }
     if (line.includes("Duration:")) {
         // Parse for full duration information
@@ -104,16 +119,16 @@ function parseFFmpegProgressOutput(line) {
 
 document.addEventListener('DOMContentLoaded', async function() {
     const loadingOverlay = document.getElementById('loadingOverlay');
+    const initOverlay = document.getElementById('initOverlay');
     const loadingText = document.getElementById('loadingText');
-    loadingOverlay.style.display = 'flex';
+    initOverlay.style.display = 'flex';
 
     try {
         await initFFmpeg(loadingText);
-        loadingText.textContent = 'FFmpeg initialized successfully';
-        loadingOverlay.style.display = 'none';
+        initOverlay.style.display = 'none';
     } catch (error) {
         console.error('FFmpeg initialization error:', error);
-        loadingText.textContent = 'Failed to initialize FFmpeg: ' + error.message;
+        initOverlay.innerHTML = '<div>Failed to initialize FFmpeg: ' + error.message + '</div>';
         return;
     }
 
@@ -292,6 +307,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         loadingOverlay.style.display = 'flex';
         loadingText.textContent = 'Processing audio files...';
+        updateProgressCircle(0); // Reset progress
 
         try {
             ffmpeg = await initFFmpeg(loadingText);
