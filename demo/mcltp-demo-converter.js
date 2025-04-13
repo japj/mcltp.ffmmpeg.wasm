@@ -13,120 +13,126 @@ const checks = {
     })()
 };
 
-if (!Object.values(checks).every(v => v)) {
-    const missing = Object.entries(checks)
-        .filter(([_, v]) => !v)
-        .map(([k]) => k)
-        .join(', ');
-    
-    const message = `Missing required features: ${missing}\n\nThis application requires:\n- Web Workers\n- Cross-Origin Isolation\n- Fixed-Width SIMD support\n- Shared Memory support`;
-    alert(message);
-    throw new Error(message);
-}
-
-// Initialize FFmpeg
-let ffmpeg;
-
-async function initFFmpeg(loadingText) {
-    ffmpeg = await createFFmpeg({
-        logger: message => {
-            //console.log('FFmpeg:', message);
-            appendToLog(message);
-        },
-        progress: p => {
-            console.log('FFmpeg progress:', p);
-            loadingText.textContent = `Processing: ${(p.ratio * 100).toFixed(0)}%`;
-            appendToLog(`Progress: ${(p.ratio * 100).toFixed(0)}%`);
-        },
-        printErr: message => {
-            //console.error('FFmpeg error:', message);
-            appendToLog(message);
-            parseFFmpegProgressOutput(message);
-            // if (loadingOverlay.style.display === 'flex') {
-            //     loadingText.textContent = 'FFmpeg error: ' + message;
-            // }
-        }
-    });
-    return ffmpeg;
-}
-
-function appendToLog(message, isError = false) {
-    const logContainer = document.getElementById('logContainer');
-    const entry = document.createElement('div');
-    entry.className = 'log-entry' + (isError ? ' log-error' : '');
-    entry.textContent = message;
-    logContainer.appendChild(entry);
-    logContainer.scrollTop = logContainer.scrollHeight;
-}
-
-let totalDurationInSeconds = 0; // Set this to the total duration of your input file if known
-
-function extractTimeInSeconds(timeMatch) {
-    // Example line: "frame=   54 fps=0.0 q=-0.0 size=     256kB time=00:00:02.16 bitrate= 968.9kbits/s speed=4.32x"
-    
-    if (timeMatch) {
-        const timeStr = timeMatch[1];
-        // Convert time string to seconds
-        const timeParts = timeStr.split(/[:,\.]/);
-        return parseInt(timeParts[0]) * 3600 + 
-               parseInt(timeParts[1]) * 60 + 
-               parseInt(timeParts[2]) + 
-               parseFloat("0." + timeParts[3]);
-    }
-    return null;
-}
-
-function updateProgressCircle(progress) {
-    const circle = document.querySelector('.progress-circle-path');
-    const percentage = document.querySelector('.progress-percentage');
-    if (circle && percentage) {
-        const circumference = 282.74; // 2 * π * 45
-        const offset = circumference - (progress * circumference);
-        circle.style.strokeDashoffset = offset;
-        percentage.textContent = Math.round(progress * 100) + '%';
-    }
-}
-
-function parseFFmpegProgressOutput(line) {
-    // Parse for progress information - FFmpeg typically outputs lines like:
-    // frame=   54 fps=0.0 q=-0.0 size=     256kB time=00:00:02.16 bitrate= 968.9kbits/s speed=4.32x
-    if (line.includes("time=") && line.includes("speed=")) {
-        const timeMatch = line.match(/time=(\d+:\d+:\d+\.\d+)/);
-        const timeInSeconds = extractTimeInSeconds(timeMatch);
+document.addEventListener('DOMContentLoaded', async function() { 
+    // if not yet cross-origin isolated, do not proceed, but wait for reload of page by coi-serviceworker
+    if (window.crossOriginIsolated !== true) return;
+    // remove hidden style from the body
+    document.body.style.visibility = 'visible';
+ 
+    if (!Object.values(checks).every(v => v)) {
+        const missing = Object.entries(checks)
+            .filter(([_, v]) => !v)
+            .map(([k]) => k)
+            .join(', ');
         
-        // If you know the total duration, you can calculate progress percentage
-        const progressRatio = timeInSeconds / totalDurationInSeconds;
-        console.log("progress",progressRatio);
-        if (totalDurationInSeconds > 0 && timeInSeconds) {
-            const progressRatio = Math.min(timeInSeconds / totalDurationInSeconds, 1);
-            updateProgressCircle(progressRatio);
+        const message = `Missing required features: ${missing}\n\nThis application requires:\n- Web Workers\n- Cross-Origin Isolation\n- Fixed-Width SIMD support\n- Shared Memory support`;
+        alert(message);
+        throw new Error(message);
+    }
+
+    // Initialize FFmpeg
+    let ffmpeg;
+
+    async function initFFmpeg(loadingText) {
+        ffmpeg = await createFFmpeg({
+            logger: message => {
+                //console.log('FFmpeg:', message);
+                appendToLog(message);
+            },
+            progress: p => {
+                console.log('FFmpeg progress:', p);
+                loadingText.textContent = `Processing: ${(p.ratio * 100).toFixed(0)}%`;
+                appendToLog(`Progress: ${(p.ratio * 100).toFixed(0)}%`);
+            },
+            printErr: message => {
+                //console.error('FFmpeg error:', message);
+                appendToLog(message);
+                parseFFmpegProgressOutput(message);
+                // if (loadingOverlay.style.display === 'flex') {
+                //     loadingText.textContent = 'FFmpeg error: ' + message;
+                // }
+            }
+        });
+        return ffmpeg;
+    }
+
+    function appendToLog(message, isError = false) {
+        const logContainer = document.getElementById('logContainer');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry' + (isError ? ' log-error' : '');
+        entry.textContent = message;
+        logContainer.appendChild(entry);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    let totalDurationInSeconds = 0; // Set this to the total duration of your input file if known
+
+    function extractTimeInSeconds(timeMatch) {
+        // Example line: "frame=   54 fps=0.0 q=-0.0 size=     256kB time=00:00:02.16 bitrate= 968.9kbits/s speed=4.32x"
+        
+        if (timeMatch) {
+            const timeStr = timeMatch[1];
+            // Convert time string to seconds
+            const timeParts = timeStr.split(/[:,\.]/);
+            return parseInt(timeParts[0]) * 3600 + 
+                   parseInt(timeParts[1]) * 60 + 
+                   parseInt(timeParts[2]) + 
+                   parseFloat("0." + timeParts[3]);
+        }
+        return null;
+    }
+
+    function updateProgressCircle(progress) {
+        const circle = document.querySelector('.progress-circle-path');
+        const percentage = document.querySelector('.progress-percentage');
+        if (circle && percentage) {
+            const circumference = 282.74; // 2 * π * 45
+            const offset = circumference - (progress * circumference);
+            circle.style.strokeDashoffset = offset;
+            percentage.textContent = Math.round(progress * 100) + '%';
         }
     }
-    if (line.includes("Duration:")) {
-        // Parse for full duration information
-        //   Duration: 00:03:45.28, start: 0.000000, bitrate: 768 kb/s
-        const durationMatch = line.match(/Duration: (\d+:\d+:\d+\.\d+)/);
-        // keep the maximum detected duration
-        if (durationMatch) {
-            const durationInSeconds = extractTimeInSeconds(durationMatch);
-            if (durationInSeconds > totalDurationInSeconds) {
-                totalDurationInSeconds = durationInSeconds;
-                console.log("Total Duration in seconds: " + totalDurationInSeconds);
+
+    function parseFFmpegProgressOutput(line) {
+        // Parse for progress information - FFmpeg typically outputs lines like:
+        // frame=   54 fps=0.0 q=-0.0 size=     256kB time=00:00:02.16 bitrate= 968.9kbits/s speed=4.32x
+        if (line.includes("time=") && line.includes("speed=")) {
+            const timeMatch = line.match(/time=(\d+:\d+:\d+\.\d+)/);
+            const timeInSeconds = extractTimeInSeconds(timeMatch);
+            
+            // If you know the total duration, you can calculate progress percentage
+            const progressRatio = timeInSeconds / totalDurationInSeconds;
+            console.log("progress",progressRatio);
+            if (totalDurationInSeconds > 0 && timeInSeconds) {
+                const progressRatio = Math.min(timeInSeconds / totalDurationInSeconds, 1);
+                updateProgressCircle(progressRatio);
+            }
+        }
+        if (line.includes("Duration:")) {
+            // Parse for full duration information
+            //   Duration: 00:03:45.28, start: 0.000000, bitrate: 768 kb/s
+            const durationMatch = line.match(/Duration: (\d+:\d+:\d+\.\d+)/);
+            // keep the maximum detected duration
+            if (durationMatch) {
+                const durationInSeconds = extractTimeInSeconds(durationMatch);
+                if (durationInSeconds > totalDurationInSeconds) {
+                    totalDurationInSeconds = durationInSeconds;
+                    console.log("Total Duration in seconds: " + totalDurationInSeconds);
+                }
             }
         }
     }
-}
 
-document.addEventListener('DOMContentLoaded', async function() {
     const loadingOverlay = document.getElementById('loadingOverlay');
     const initOverlay = document.getElementById('initOverlay');
     const loadingText = document.getElementById('loadingText');
-    initOverlay.style.display = 'flex';
+    //initOverlay.style.display = 'flex';
 
     try {
         await initFFmpeg(loadingText);
-        initOverlay.style.display = 'none';
+        //initOverlay.style.display = 'none';
     } catch (error) {
+        initOverlay.style.display = 'flex';
         console.error('FFmpeg initialization error:', error);
         initOverlay.innerHTML = '<div>Failed to initialize FFmpeg: ' + error.message + '</div>';
         return;

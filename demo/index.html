@@ -251,7 +251,11 @@
         .log-error {
             color: #e74c3c;
         }
+        body { visibility: hidden; }
     </style>
+    <script src="coi-serviceworker.js"></script>
+    <script src="mcltp.ffmpeg-lgpl.js"></script>
+    <script src="mcltp-demo-converter.js"></script>
 </head>
 <body>
     <h1>Multi Channel Learning Tracks Playback - Convertor</h1>
@@ -298,9 +302,5 @@
         </div>
         <div id="loadingText">Processing...</div>
     </div>
-
-    <script src="coi-serviceworker.js"></script>
-    <script src="mcltp.ffmpeg-lgpl.js"></script>
-    <script src="mcltp-demo-converter.js"></script>
 </body>
 </html>
